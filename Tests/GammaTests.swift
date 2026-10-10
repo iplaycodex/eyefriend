@@ -32,13 +32,9 @@ func runGammaTests(check: (Bool, String) -> Void) {
     for (hour, level) in [(0.0, 0.75), (3, 0.9), (7, 0.3), (12, 0.1), (18, 0.3), (24, 0.75), (16.5, 0.25)] {
         check(near(EyeComfort.smartLevel(hour: hour), level), "smart curve at \(hour): \(level)")
     }
-    for (hour, gain) in [(0.0, 0.8), (4, 0.8), (6, 0.9), (8, 1), (12, 1), (20, 1), (22, 0.9), (24, 0.8)] {
-        check(near(EyeComfort.nightGreen(hour: hour), gain), "night curve at \(hour): \(gain)")
-    }
     check((0..<1440).allSatisfy {
         let h = Double($0) / 60
-        return (0.0999...0.9001).contains(EyeComfort.smartLevel(hour: h)) &&
-               (0.7999...1.0001).contains(EyeComfort.nightGreen(hour: h))
+        return (0.0999...0.9001).contains(EyeComfort.smartLevel(hour: h))
     }, "all 1440 minutes remain in curve bounds")
     check([3.0, 7, 12, 18].allSatisfy {
         abs(EyeComfort.smartLevel(hour: $0 - 0.00001) - EyeComfort.smartLevel(hour: $0)) < 0.00001
@@ -47,19 +43,17 @@ func runGammaTests(check: (Bool, String) -> Void) {
     calendar.timeZone = TimeZone(secondsFromGMT: 8 * 3600)!
     let date = calendar.date(from: DateComponents(year: 2026, month: 10, day: 10, hour: 16, minute: 30))!
     check(near(EyeComfort.hour(at: date, calendar: calendar), 16.5), "local time uses minutes / 60")
-    let gain = EyeComfort.gains(level: 0.9, dimming: 0, night: false, hour: 3)
+    let gain = EyeComfort.gains(level: 0.9)
     check(near(gain.red, 0.91) && near(gain.green, 0.775) && near(gain.blue, 0.55), "original RGB attenuation coefficients")
-    let night = EyeComfort.gains(level: 0.9, dimming: 1, night: true, hour: 3)
-    check(near(night.red, 0.455) && near(night.green, 0.31) && near(night.blue, 0.275),
-          "night green gain and dimming compose independently")
-    check(EyeComfort.gains(level: .nan, dimming: .infinity, night: true, hour: .nan) == .identity,
-          "nonfinite inputs safely resolve to identity")
+    let lowerGain = EyeComfort.gains(level: 0.1)
+    check(near(lowerGain.red, 0.99) && near(lowerGain.green, 0.975) && near(lowerGain.blue, 0.95),
+          "no additional dimming or night green coefficient")
+    check(EyeComfort.gains(level: .nan) == .identity, "nonfinite strength resolves to identity")
 
     let model = AppModel(preferences: nil)
     let local = Calendar.current
     let noon = local.date(from: DateComponents(year: 2026, month: 10, day: 10, hour: 12))!
     let midnight = local.date(from: DateComponents(year: 2026, month: 10, day: 11, hour: 0))!
-    model.warmth = 0.42
     model.smartEnabled = true
     model.tick(at: noon)
     check(near(model.effectiveLevel, 0.1), "automatic mode follows injected noon time")
@@ -67,13 +61,31 @@ func runGammaTests(check: (Bool, String) -> Void) {
     check(near(model.effectiveLevel, 0.75), "automatic mode changes across midnight")
     model.smartEnabled = false
     model.tick(at: noon)
-    check(near(model.effectiveLevel, 0.42), "leaving automatic mode restores manual setting")
-    model.nightEnabled = true
-    model.tick(at: midnight)
-    check(near(model.gammaGains.green, (1 - 0.25 * 0.42) * 0.95 * 0.8),
-          "night mode applies even with manual warmth")
-    model.tick(at: noon)
-    check(near(model.gammaGains.green, (1 - 0.25 * 0.42) * 0.95), "night mode recovers during daytime")
+    check(!model.smartEnabled, "timer does not re-enable disabled protection")
+
+    func restoredModel(_ values: [String: Any]) -> AppModel {
+        let suite = "local.eyerest.tests." + UUID().uuidString
+        let defaults = UserDefaults(suiteName: suite)!
+        defaults.setVolatileDomain(values, forName: UserDefaults.argumentDomain)
+        defer { defaults.removeVolatileDomain(forName: UserDefaults.argumentDomain) }
+        return AppModel(preferences: defaults)
+    }
+    check(!restoredModel([:]).smartEnabled, "fresh install stays disabled")
+    check(restoredModel(["filterEnabled": true, "smartEnabled": true]).smartEnabled,
+          "upgrade preserves active automatic protection")
+    check(!restoredModel(["filterEnabled": false, "smartEnabled": true]).smartEnabled,
+          "upgrade preserves disabled master switch")
+    check(!restoredModel(["filterEnabled": true, "smartEnabled": false]).smartEnabled,
+          "removed manual mode does not silently enable automatic protection")
+    check(restoredModel(["intelligentEnabled": true, "filterEnabled": false]).smartEnabled,
+          "new single-switch preference overrides legacy master")
+    check(!restoredModel(["intelligentEnabled": false, "filterEnabled": true, "smartEnabled": true]).smartEnabled,
+          "new disabled preference overrides old switches")
+    let legacy = restoredModel(["filterEnabled": true, "smartEnabled": true, "nightEnabled": true,
+                                "dimming": 1.0, "warmth": 1.0, "reminderEnabled": true])
+    legacy.tick(at: midnight)
+    let midnightGain = EyeComfort.gains(level: 0.75)
+    check(legacy.gammaGains == midnightGain, "removed settings cannot affect automatic Gamma")
 
     let backend = FakeGamma()
     let gamma = ScreenGamma(backend: backend)
@@ -82,12 +94,12 @@ func runGammaTests(check: (Bool, String) -> Void) {
     let applied = backend.tables
     _ = gamma.apply(enabled: true, gains: gain)
     check(backend.tables == applied && backend.writes == 2, "unchanged gain does not accumulate or rewrite")
-    _ = gamma.apply(enabled: true, gains: night)
-    check(backend.tables[1] == FakeGamma.baseline.scaled(by: night), "changed gain derives from original calibration")
+    _ = gamma.apply(enabled: true, gains: lowerGain)
+    check(backend.tables[1] == FakeGamma.baseline.scaled(by: lowerGain), "changed gain derives from original calibration")
     gamma.invalidate()
     backend.tables[1] = FakeGamma.baseline
-    _ = gamma.apply(enabled: true, gains: night)
-    check(backend.tables[1] == FakeGamma.baseline.scaled(by: night), "wake/reconfiguration reapplies same gains")
+    _ = gamma.apply(enabled: true, gains: lowerGain)
+    check(backend.tables[1] == FakeGamma.baseline.scaled(by: lowerGain), "wake/reconfiguration reapplies same gains")
     backend.ids = [2]
     _ = gamma.restore()
     check(gamma.originals[1] != nil && backend.tables[2] == FakeGamma.baseline,

@@ -27,19 +27,10 @@ enum EyeComfort {
         return 0.3 + (t - 18) * 0.075
     }
 
-    static func nightGreen(hour t: Double) -> Double {
-        guard t.isFinite, t >= 0, t <= 24 else { return 1 }
-        if t < 4 { return 0.8 }
-        if t < 8 { return 0.8 + (t - 4) * 0.05 }
-        if t < 20 { return 1 }
-        return 1 - (t - 20) * 0.05
-    }
-
-    static func gains(level: Double, dimming: Double, night: Bool, hour: Double) -> RGBGain {
+    static func gains(level: Double) -> RGBGain {
         let strength = clamp(level)
-        let brightness = 1 - 0.5 * clamp(dimming)
-        return RGBGain(red: (1 - 0.1 * strength) * brightness,
-                       green: (1 - 0.25 * strength) * brightness * (night ? nightGreen(hour: hour) : 1),
-                       blue: (1 - 0.5 * strength) * brightness)
+        return RGBGain(red: 1 - 0.1 * strength,
+                       green: 1 - 0.25 * strength,
+                       blue: 1 - 0.5 * strength)
     }
 }

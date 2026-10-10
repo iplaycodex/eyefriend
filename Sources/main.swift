@@ -2,7 +2,7 @@ import AppKit
 import SwiftUI
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate {
     #if EYE_REST_TESTING
     let model = AppModel(preferences: nil)
     #else
@@ -11,10 +11,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     let gamma = ScreenGamma()
     private var sleeping = false
     private(set) var mainWindow: NSWindow!
-    private(set) var restPanel: NSPanel!
     private(set) var statusItem: NSStatusItem!
-    private var filterItem: NSMenuItem!
-    private var reminderItem: NSMenuItem!
+    private var smartItem: NSMenuItem!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.appearance = NSAppearance(named: .aqua)
@@ -45,22 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         mainWindow.contentView = content
         mainWindow.setContentSize(size)
         mainWindow.isReleasedWhenClosed = false
-        mainWindow.delegate = self
         mainWindow.center()
-
-        let restContent = NSHostingView(rootView: RestView(model: model))
-        restPanel = NSPanel(contentRect: NSRect(origin: .zero, size: restContent.fittingSize),
-            styleMask: [.titled, .closable, .utilityWindow, .nonactivatingPanel],
-            backing: .buffered, defer: false)
-        restPanel.title = "休息一下"
-        restPanel.contentView = restContent
-        restPanel.isReleasedWhenClosed = false
-        restPanel.isFloatingPanel = true
-        restPanel.hidesOnDeactivate = false
-        restPanel.level = .floating
-        restPanel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
-        restPanel.delegate = self
-        restPanel.center()
     }
 
     private func item(_ title: String, _ action: Selector, key: String = "") -> NSMenuItem {
@@ -102,32 +85,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let menu = NSMenu()
         menu.addItem(item("打开留白", #selector(showMainWindow)))
         menu.addItem(.separator())
-        filterItem = item("开启屏幕调节", #selector(toggleFilter))
-        reminderItem = item("开启休息提醒", #selector(toggleReminder))
-        menu.addItem(filterItem)
-        menu.addItem(reminderItem)
-        menu.addItem(item("现在休息", #selector(restNow)))
+        smartItem = item("开启智能护眼", #selector(toggleSmart))
+        menu.addItem(smartItem)
         menu.addItem(.separator())
         menu.addItem(item("退出留白", #selector(quit), key: "q"))
         statusItem.menu = menu
     }
 
     func refresh() {
-        let error = gamma.apply(enabled: model.filterEnabled && !sleeping, gains: model.gammaGains)
+        let error = gamma.apply(enabled: model.smartEnabled && !sleeping, gains: model.gammaGains)
         if model.gammaError != error { model.gammaError = error }
-        filterItem.title = model.filterEnabled ? "关闭屏幕调节" : "开启屏幕调节"
-        filterItem.state = model.filterEnabled ? .on : .off
-        reminderItem.title = model.reminderEnabled ? "暂停休息提醒" : "开启休息提醒"
-        reminderItem.state = model.reminderEnabled ? .on : .off
-        statusItem.button?.toolTip = model.reminderEnabled
-            ? "留白 · \(model.schedule.phase == .resting ? "休息剩余" : "下次休息") \(model.countdown)"
-            : "留白 · 休息提醒未开启"
-        if model.schedule.phase == .resting {
-            if !restPanel.isVisible {
-                restPanel.center()
-                restPanel.orderFrontRegardless()
-            }
-        } else { restPanel.orderOut(nil) }
+        smartItem.title = model.smartEnabled ? "关闭智能护眼" : "开启智能护眼"
+        smartItem.state = model.smartEnabled ? .on : .off
+        statusItem.button?.toolTip = model.gammaError.map { "留白 · " + $0 } ??
+            (model.smartEnabled ? "留白 · 智能护眼 \(Int((model.effectiveLevel * 100).rounded()))%" : "留白 · 智能护眼已关闭")
     }
 
     @objc func showMainWindow() {
@@ -139,14 +110,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     @objc func minimizeMainWindow() { mainWindow.performMiniaturize(nil) }
     @objc func closeMainWindow() { mainWindow.performClose(nil) }
-    @objc func toggleFilter() { model.filterEnabled.toggle() }
-    @objc func toggleReminder() { model.reminderEnabled.toggle() }
-    @objc func restNow() { model.restNow() }
+    @objc func toggleSmart() { model.smartEnabled.toggle() }
     @objc func quit() { NSApp.terminate(nil) }
     @objc func about() {
         NSApp.orderFrontStandardAboutPanel(options: [
-            .applicationName: "留白", .applicationVersion: "0.2.0",
-            .credits: NSAttributedString(string: "柔和屏幕，记得休息。\n为你的 Mac 制作。")
+            .applicationName: "留白", .applicationVersion: "0.3.0",
+            .credits: NSAttributedString(string: "跟随时间，自动调节屏幕。\n为你的 Mac 制作。")
         ])
     }
 
@@ -163,7 +132,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @objc func wokeUp() {
         sleeping = false
         gamma.invalidate()
-        model.resetAfterWake()
+        model.tick()
         screensChanged()
     }
 
@@ -171,11 +140,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
         showMainWindow()
-        return true
-    }
-
-    func windowShouldClose(_ sender: NSWindow) -> Bool {
-        if sender === restPanel { model.snooze(); return false }
         return true
     }
 
