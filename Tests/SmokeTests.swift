@@ -11,6 +11,8 @@ func runSmokeTests(app: AppDelegate) async {
     }
     func settle() async { try? await Task.sleep(for: .seconds(0.8)) }
 
+    runGammaTests(check: check)
+
     let now = Date(timeIntervalSince1970: 1000)
     var schedule = RestSchedule()
     check(schedule.phase == .paused && schedule.deadline == nil, "reminder initially paused")
@@ -66,13 +68,43 @@ func runSmokeTests(app: AppDelegate) async {
     await settle()
     check(app.mainWindow.isVisible, "menu bar reopens closed window")
 
-    app.model.filterEnabled = true
-    check(!NSScreen.screens.isEmpty && app.filters.windows.count == NSScreen.screens.count,
-          "one filter per connected screen")
-    check(app.filters.windows.allSatisfy { $0.ignoresMouseEvents && !$0.canBecomeKey && $0.isVisible },
-          "filters are visible and do not intercept input")
-    app.model.filterEnabled = false
-    check(app.filters.windows.isEmpty, "disabling filter removes windows")
+    let backend = CoreGraphicsGamma()
+    var before: [UInt32: GammaTable] = [:]
+    do {
+        for display in try backend.displays() { before[display] = try backend.read(display) }
+        check(!before.isEmpty, "read actual display gamma baseline")
+        app.model.smartEnabled = true
+        app.model.nightEnabled = true
+        app.model.filterEnabled = true
+        check(app.model.gammaError == nil && app.gamma.originals.count == before.count,
+              "Gamma applied to connected displays")
+        for (display, baseline) in before {
+            let actual = try backend.read(display)
+            check(tablesClose(actual, baseline.scaled(by: app.model.gammaGains)),
+                  "display \(display) actual Gamma readback matches target")
+            check(!tablesClose(actual, baseline), "display \(display) actually changes")
+        }
+        let lateNight = EyeComfort.gains(level: 0.75, dimming: 0.1, night: true, hour: 0)
+        check(app.gamma.apply(enabled: true, gains: lateNight) == nil, "apply midnight Gamma without changing system clock")
+        for (display, baseline) in before {
+            check(tablesClose(try backend.read(display), baseline.scaled(by: lateNight)),
+                  "display \(display) midnight green attenuation readback")
+        }
+        app.willSleep()
+        for (display, baseline) in before {
+            check(tablesClose(try backend.read(display), baseline), "sleep restores display \(display)")
+        }
+        app.wokeUp()
+        check(app.gamma.originals.count == before.count, "wake reapplies screen adjustments")
+        app.model.filterEnabled = false
+        for (display, baseline) in before {
+            check(tablesClose(try backend.read(display), baseline), "disable restores display \(display)")
+        }
+        check(app.gamma.originals.isEmpty, "successful restore releases snapshots")
+    } catch {
+        check(false, "real Gamma verification: \(error.localizedDescription)")
+        _ = app.gamma.restore()
+    }
     app.model.restNow()
     app.model.resetAfterWake()
     check(app.model.schedule.phase == .focusing && !app.restPanel.isVisible,
@@ -82,7 +114,11 @@ func runSmokeTests(app: AppDelegate) async {
           "disabling reminders clears rest state")
     app.model.filterEnabled = true
     app.applicationWillTerminate(Notification(name: NSApplication.willTerminateNotification))
-    check(app.filters.windows.isEmpty, "quit cleanup removes filters")
+    check(app.gamma.originals.isEmpty, "quit cleanup restores Gamma")
+    for (display, baseline) in before {
+        do { check(tablesClose(try backend.read(display), baseline), "quit restores display \(display) readback") }
+        catch { check(false, "quit readback failed: \(error)") }
+    }
 
     print("RESULT: \(checks - failures.count)/\(checks) passed")
     if !failures.isEmpty { print(failures.joined(separator: "\n")) }

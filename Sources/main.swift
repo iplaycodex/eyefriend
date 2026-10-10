@@ -8,13 +8,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     #else
     let model = AppModel(preferences: .standard)
     #endif
-    let filters = ScreenFilters()
+    let gamma = ScreenGamma()
+    private var sleeping = false
     private(set) var mainWindow: NSWindow!
     private(set) var restPanel: NSPanel!
     private(set) var statusItem: NSStatusItem!
     private var filterItem: NSMenuItem!
     private var reminderItem: NSMenuItem!
-    private var lastFilterState = ""
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.appearance = NSAppearance(named: .aqua)
@@ -26,6 +26,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
             name: NSApplication.didChangeScreenParametersNotification, object: nil)
         NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(wokeUp),
             name: NSWorkspace.didWakeNotification, object: nil)
+        NSWorkspace.shared.notificationCenter.addObserver(self, selector: #selector(willSleep),
+            name: NSWorkspace.willSleepNotification, object: nil)
         model.startTimer()
         refresh()
         showMainWindow()
@@ -100,7 +102,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let menu = NSMenu()
         menu.addItem(item("打开留白", #selector(showMainWindow)))
         menu.addItem(.separator())
-        filterItem = item("开启屏幕滤镜", #selector(toggleFilter))
+        filterItem = item("开启屏幕调节", #selector(toggleFilter))
         reminderItem = item("开启休息提醒", #selector(toggleReminder))
         menu.addItem(filterItem)
         menu.addItem(reminderItem)
@@ -111,12 +113,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     }
 
     func refresh() {
-        let filterState = "\(model.filterEnabled)-\(model.warmth)-\(model.dimming)"
-        if filterState != lastFilterState {
-            filters.apply(enabled: model.filterEnabled, warmth: model.warmth, dimming: model.dimming)
-            lastFilterState = filterState
-        }
-        filterItem.title = model.filterEnabled ? "关闭屏幕滤镜" : "开启屏幕滤镜"
+        let error = gamma.apply(enabled: model.filterEnabled && !sleeping, gains: model.gammaGains)
+        if model.gammaError != error { model.gammaError = error }
+        filterItem.title = model.filterEnabled ? "关闭屏幕调节" : "开启屏幕调节"
         filterItem.state = model.filterEnabled ? .on : .off
         reminderItem.title = model.reminderEnabled ? "暂停休息提醒" : "开启休息提醒"
         reminderItem.state = model.reminderEnabled ? .on : .off
@@ -146,18 +145,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     @objc func quit() { NSApp.terminate(nil) }
     @objc func about() {
         NSApp.orderFrontStandardAboutPanel(options: [
-            .applicationName: "留白", .applicationVersion: "0.1.0",
+            .applicationName: "留白", .applicationVersion: "0.2.0",
             .credits: NSAttributedString(string: "柔和屏幕，记得休息。\n为你的 Mac 制作。")
         ])
     }
 
     @objc private func screensChanged() {
-        filters.remove()
-        lastFilterState = ""
+        gamma.invalidate()
         refresh()
     }
 
-    @objc private func wokeUp() {
+    @objc func willSleep() {
+        sleeping = true
+        refresh()
+    }
+
+    @objc func wokeUp() {
+        sleeping = false
+        gamma.invalidate()
         model.resetAfterWake()
         screensChanged()
     }
@@ -174,9 +179,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         return true
     }
 
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if let error = gamma.restore() {
+            model.gammaError = error
+            showMainWindow()
+            return .terminateCancel
+        }
+        return .terminateNow
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         model.stopTimer()
-        filters.remove()
+        _ = gamma.restore()
         NSStatusBar.system.removeStatusItem(statusItem)
     }
 }

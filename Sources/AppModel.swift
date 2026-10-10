@@ -3,6 +3,9 @@ import SwiftUI
 
 @MainActor
 final class AppModel: ObservableObject {
+    @Published var smartEnabled = false { didSet { update() } }
+    @Published var nightEnabled = false { didSet { update() } }
+    @Published var gammaError: String?
     @Published var filterEnabled = false { didSet { update() } }
     @Published var warmth = 0.28 { didSet { update() } }
     @Published var dimming = 0.10 { didSet { update() } }
@@ -34,6 +37,8 @@ final class AppModel: ObservableObject {
     init(preferences: UserDefaults?) {
         self.preferences = preferences
         if let preferences {
+            smartEnabled = preferences.bool(forKey: "smartEnabled")
+            nightEnabled = preferences.bool(forKey: "nightEnabled")
             filterEnabled = preferences.bool(forKey: "filterEnabled")
             warmth = Self.clamp(preferences.object(forKey: "warmth") as? Double ?? 0.28)
             dimming = Self.clamp(preferences.object(forKey: "dimming") as? Double ?? 0.10)
@@ -47,7 +52,16 @@ final class AppModel: ObservableObject {
     }
 
     static func clamp(_ value: Double) -> Double {
-        value.isFinite ? min(1, max(0, value)) : 0
+        EyeComfort.clamp(value)
+    }
+
+    var effectiveLevel: Double {
+        smartEnabled ? EyeComfort.smartLevel(hour: EyeComfort.hour(at: now)) : warmth
+    }
+
+    var gammaGains: RGBGain {
+        EyeComfort.gains(level: effectiveLevel, dimming: dimming, night: nightEnabled,
+                         hour: EyeComfort.hour(at: now))
     }
 
     var countdown: String {
@@ -69,8 +83,8 @@ final class AppModel: ObservableObject {
         timer = nil
     }
 
-    func tick() {
-        now = Date()
+    func tick(at date: Date = Date()) {
+        now = date
         schedule.tick(now: now, minutes: interval, seconds: duration)
         onChange?()
     }
@@ -105,6 +119,8 @@ final class AppModel: ObservableObject {
     private func update() {
         now = Date()
         if let preferences {
+            preferences.set(smartEnabled, forKey: "smartEnabled")
+            preferences.set(nightEnabled, forKey: "nightEnabled")
             preferences.set(filterEnabled, forKey: "filterEnabled")
             preferences.set(warmth, forKey: "warmth")
             preferences.set(dimming, forKey: "dimming")
@@ -113,54 +129,5 @@ final class AppModel: ObservableObject {
             preferences.set(duration, forKey: "duration")
         }
         onChange?()
-    }
-}
-
-final class FilterWindow: NSWindow {
-    override var canBecomeKey: Bool { false }
-    override var canBecomeMain: Bool { false }
-}
-
-@MainActor
-final class ScreenFilters {
-    private(set) var windows: [FilterWindow] = []
-
-    func apply(enabled: Bool, warmth: Double, dimming: Double) {
-        guard enabled else { remove(); return }
-        if windows.count != NSScreen.screens.count { rebuild() }
-        let warmAlpha = AppModel.clamp(warmth) * 0.30
-        let darkAlpha = AppModel.clamp(dimming) * 0.50
-        // Compose amber over black, keeping a bounded, reversible opacity.
-        let alpha = warmAlpha + darkAlpha * (1 - warmAlpha)
-        let factor = alpha > 0 ? warmAlpha / alpha : 0
-        let color = NSColor(srgbRed: factor, green: 0.65 * factor,
-                            blue: 0.22 * factor, alpha: alpha)
-        for (window, screen) in zip(windows, NSScreen.screens) {
-            window.setFrame(screen.frame, display: true)
-            window.backgroundColor = color
-            window.orderFrontRegardless()
-        }
-    }
-
-    func rebuild() {
-        remove()
-        windows = NSScreen.screens.map { screen in
-            let window = FilterWindow(contentRect: screen.frame, styleMask: .borderless,
-                                      backing: .buffered, defer: false)
-            window.isReleasedWhenClosed = false
-            window.isOpaque = false
-            window.hasShadow = false
-            window.ignoresMouseEvents = true
-            window.hidesOnDeactivate = false
-            window.level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
-            window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary, .ignoresCycle]
-            window.isExcludedFromWindowsMenu = true
-            return window
-        }
-    }
-
-    func remove() {
-        windows.forEach { $0.close() }
-        windows.removeAll()
     }
 }

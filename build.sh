@@ -5,13 +5,13 @@ TASK_BUILD="$TASK_ROOT/.build"
 TASK_APP="$TASK_ROOT/dist/留白.app"
 mkdir -p "$TASK_BUILD/ModuleCache" "$TASK_APP/Contents/MacOS" "$TASK_APP/Contents/Resources"
 export CLANG_MODULE_CACHE_PATH="$TASK_BUILD/ModuleCache"
-if [[ "${1:-}" == "--test" ]]; then
+if [[ "${1:-}" == "--test" || "${1:-}" == "--compile-tests" ]]; then
     xcrun swiftc -swift-version 6 -target arm64-apple-macos14.0 \
         -module-cache-path "$TASK_BUILD/ModuleCache" \
         -D EYE_REST_TESTING -g \
-        "$TASK_ROOT"/Sources/*.swift "$TASK_ROOT/Tests/SmokeTests.swift" \
+        "$TASK_ROOT"/Sources/*.swift "$TASK_ROOT"/Tests/*.swift \
         -o "$TASK_BUILD/EyeRestSmoke"
-    "$TASK_BUILD/EyeRestSmoke"
+    if [[ "${1:-}" == "--test" ]]; then "$TASK_BUILD/EyeRestSmoke"; fi
 else
     xcrun swiftc -swift-version 6 -target arm64-apple-macos14.0 \
         -module-cache-path "$TASK_BUILD/ModuleCache" -O \

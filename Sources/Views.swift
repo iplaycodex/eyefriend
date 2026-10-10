@@ -8,6 +8,7 @@ struct MainView: View {
     @ObservedObject var model: AppModel
 
     var body: some View {
+        ScrollView {
         VStack(alignment: .leading, spacing: 22) {
             HStack(alignment: .top) {
                 VStack(alignment: .leading, spacing: 7) {
@@ -30,12 +31,26 @@ struct MainView: View {
                         .font(.system(size: 16, weight: .semibold))
                 }.toggleStyle(.switch)
 
-                filterSlider("暖色滤镜", value: $model.warmth,
+                HStack {
+                    Toggle("智能护眼", isOn: $model.smartEnabled)
+                    Spacer()
+                    Toggle("夜间助眠", isOn: $model.nightEnabled)
+                }.toggleStyle(.switch).disabled(!model.filterEnabled)
+                Text(model.smartEnabled ? "跟随本地时间调整：中午柔和，夜间增强。" : "手动选择强度，也可开启智能护眼随时间调整。")
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                filterSlider(model.smartEnabled ? "当前护眼强度 · 自动" : "手动护眼强度",
+                             value: Binding(get: { model.effectiveLevel }, set: { model.warmth = $0 }),
                              start: "自然", end: "暖琥珀", symbol: "sun.max")
+                    .disabled(model.smartEnabled)
                 filterSlider("屏幕调暗", value: $model.dimming,
                              start: "原始亮度", end: "更暗", symbol: "moon")
-                Text("滤镜作用于所有已连接屏幕，关闭即可恢复。")
+                Text("关闭后恢复启用前的屏幕颜色。夜间助眠在 20:00—08:00 生效。")
                     .font(.system(size: 11)).foregroundStyle(.secondary)
+                if let error = model.gammaError {
+                    Text("屏幕调节已暂停：" + error)
+                        .font(.system(size: 11)).foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }.padding(22).background(.white.opacity(0.8), in: RoundedRectangle(cornerRadius: 20))
 
             VStack(alignment: .leading, spacing: 18) {
@@ -74,7 +89,8 @@ struct MainView: View {
             }.font(.system(size: 11)).foregroundStyle(.secondary)
         }
         .padding(30)
-        .frame(width: 520)
+        }
+        .frame(width: 520, height: 710)
         .foregroundStyle(ink).tint(leaf).background(paper)
         .preferredColorScheme(.light)
     }
