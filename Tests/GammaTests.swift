@@ -8,16 +8,26 @@ final class FakeGamma: GammaBackend {
     var failRead: UInt32?
     var failWrite: UInt32?
     var failOnce = false
+    var failList = false
+    var listReads = 0
+    var tableOnWriteFailure: GammaTable?
+    var failReadAfterWriteFailure = false
     var writes = 0
     static let baseline = GammaTable(red: [0, 0.23, 0.75, 1],
                                      green: [0, 0.31, 0.8, 1], blue: [0, 0.2, 0.7, 1])
-    func displays() throws -> [UInt32] { ids }
+    func displays() throws -> [UInt32] {
+        listReads += 1
+        if failList { throw GammaError(message: "simulated display list failure") }
+        return ids
+    }
     func read(_ display: UInt32) throws -> GammaTable {
         if failRead == display { throw GammaError(message: "simulated read failure") }
         return tables[display]!
     }
     func write(_ table: GammaTable, to display: UInt32) throws {
         if failWrite == display {
+            if let tableOnWriteFailure { tables[display] = tableOnWriteFailure }
+            if failReadAfterWriteFailure { failRead = display }
             if failOnce { failWrite = nil }
             throw GammaError(message: "simulated write failure")
         }
@@ -124,6 +134,67 @@ func runGammaTests(check: (Bool, String) -> Void) {
     backend.failWrite = nil
     check(gamma.restore() == nil && gamma.originals.isEmpty && backend.tables[1] == FakeGamma.baseline,
           "retry completes previously failed restore")
+
+    let rejecting = FakeGamma()
+    rejecting.failWrite = 2
+    let rejectingGamma = ScreenGamma(backend: rejecting)
+    check(rejectingGamma.apply(enabled: true, gains: gain) != nil,
+          "permanent rejection still reports apply failure")
+    check(rejecting.tables.values.allSatisfy { $0 == FakeGamma.baseline },
+          "permanent rejection rolls back the other display")
+    check(rejectingGamma.originals.isEmpty,
+          "confirmed unchanged rejected display releases snapshot")
+    check(rejectingGamma.apply(enabled: false, gains: gain) == nil && rejectingGamma.fault == nil,
+          "disable succeeds after confirmed unchanged rejection")
+    check(rejectingGamma.restore() == nil, "quit restoration succeeds after permanent rejection")
+    rejecting.failWrite = nil
+    check(rejectingGamma.apply(enabled: true, gains: gain) == nil && rejectingGamma.originals.count == 2,
+          "re-enable captures both displays after rejection recovery")
+    _ = rejectingGamma.restore()
+
+    let unknown = FakeGamma()
+    unknown.failWrite = 2
+    unknown.failReadAfterWriteFailure = true
+    let unknownGamma = ScreenGamma(backend: unknown)
+    _ = unknownGamma.apply(enabled: true, gains: gain)
+    check(unknownGamma.originals[2] != nil && unknownGamma.restore() != nil,
+          "failed readback retains unknown snapshot and blocks exit")
+    unknown.failRead = nil
+    unknown.failWrite = nil
+    check(unknownGamma.restore() == nil && unknownGamma.originals.isEmpty,
+          "unknown snapshot can be restored on retry")
+
+    let partial = FakeGamma()
+    partial.failWrite = 2
+    partial.tableOnWriteFailure = FakeGamma.baseline.scaled(by: gain)
+    let partialGamma = ScreenGamma(backend: partial)
+    _ = partialGamma.apply(enabled: true, gains: gain)
+    check(partialGamma.originals[2] != nil && partialGamma.restore() != nil,
+          "partial mutation despite write failure retains snapshot and blocks exit")
+    partial.failWrite = nil
+    check(partialGamma.restore() == nil && partial.tables[2] == FakeGamma.baseline,
+          "partial mutation restores baseline on retry")
+
+    let empty = FakeGamma()
+    empty.failList = true
+    let emptyGamma = ScreenGamma(backend: empty)
+    check(emptyGamma.restore() == nil && empty.listReads == 0,
+          "never-enabled quit avoids display enumeration")
+    _ = emptyGamma.apply(enabled: true, gains: gain)
+    let listReads = empty.listReads
+    check(emptyGamma.apply(enabled: false, gains: gain) == nil && emptyGamma.fault == nil &&
+          empty.listReads == listReads, "empty restore clears prior fault without enumeration")
+
+    let pending = FakeGamma()
+    let pendingGamma = ScreenGamma(backend: pending)
+    _ = pendingGamma.apply(enabled: true, gains: gain)
+    pending.failList = true
+    check(pendingGamma.restore() != nil && pendingGamma.originals.count == 2,
+          "enumeration failure with modified displays still blocks exit")
+    pending.failList = false
+    check(pendingGamma.restore() == nil && pendingGamma.originals.isEmpty,
+          "pending snapshots restore after enumeration recovers")
+
 }
 
 func tablesClose(_ a: GammaTable, _ b: GammaTable, tolerance: Float = 0.005) -> Bool {

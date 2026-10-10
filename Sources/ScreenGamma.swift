@@ -106,15 +106,26 @@ final class ScreenGamma {
     // Keep failed/disconnected snapshots so later retries can still restore them.
     @discardableResult
     func restore() -> String? {
+        guard !originals.isEmpty else {
+            fault = nil
+            return nil
+        }
         do {
             let connected = Set(try backend.displays())
             var errors: [String] = []
             for (display, baseline) in originals where connected.contains(display) {
                 do {
                     try backend.write(baseline, to: display)
-                    originals.removeValue(forKey: display)
-                    lastGains.removeValue(forKey: display)
-                } catch { errors.append(error.localizedDescription) }
+                } catch {
+                    // A rejected write may leave the screen unchanged, or may partially apply.
+                    // Release the snapshot only when readback proves the baseline is intact.
+                    guard let current = try? backend.read(display), current == baseline else {
+                        errors.append(error.localizedDescription)
+                        continue
+                    }
+                }
+                originals.removeValue(forKey: display)
+                lastGains.removeValue(forKey: display)
             }
             fault = errors.isEmpty ? nil : errors.joined(separator: " ")
         } catch { fault = error.localizedDescription }

@@ -5,7 +5,14 @@ TASK_BUILD="$TASK_ROOT/.build"
 TASK_APP="$TASK_ROOT/dist/EyeFriend.app"
 mkdir -p "$TASK_BUILD/ModuleCache" "$TASK_APP/Contents/MacOS" "$TASK_APP/Contents/Resources"
 export CLANG_MODULE_CACHE_PATH="$TASK_BUILD/ModuleCache"
-if [[ "${1:-}" == "--test" || "${1:-}" == "--compile-tests" ]]; then
+if [[ "${1:-}" == "--unit-test" ]]; then
+    xcrun swiftc -swift-version 6 -target arm64-apple-macos14.0 \
+        -module-cache-path "$TASK_BUILD/ModuleCache" -D EYE_REST_UNIT_TESTING -g \
+        "$TASK_ROOT"/Sources/AppModel.swift "$TASK_ROOT"/Sources/EyeComfort.swift \
+        "$TASK_ROOT"/Sources/ScreenGamma.swift "$TASK_ROOT"/Tests/GammaTests.swift \
+        "$TASK_ROOT"/Tests/UnitTests.swift -o "$TASK_BUILD/EyeRestUnitTests"
+    "$TASK_BUILD/EyeRestUnitTests"
+elif [[ "${1:-}" == "--test" || "${1:-}" == "--compile-tests" ]]; then
     xcrun swiftc -swift-version 6 -target arm64-apple-macos14.0 \
         -module-cache-path "$TASK_BUILD/ModuleCache" \
         -D EYE_REST_TESTING -g \
