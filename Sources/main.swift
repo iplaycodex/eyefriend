@@ -16,6 +16,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.appearance = NSAppearance(named: .aqua)
+        #if !EYE_REST_TESTING
+        NSApp.applicationIconImage = Artwork.image("AppIcon", extension: "icns")
+        #endif
         buildMenu()
         buildWindows()
         buildStatusItem()
@@ -79,9 +82,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func buildStatusItem() {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        let icon = NSImage(systemSymbolName: "eye", accessibilityDescription: "留白")
-        icon?.isTemplate = true
+        let icon = Artwork.image("StatusBar_Icon")
+        icon.size = NSSize(width: 22, height: 22)
+        icon.isTemplate = true
         statusItem.button?.image = icon
+        let highlightedIcon = Artwork.image("StatusBar_Icon_Highlight")
+        highlightedIcon.size = NSSize(width: 22, height: 22)
+        highlightedIcon.isTemplate = true
+        statusItem.button?.alternateImage = highlightedIcon
+        statusItem.button?.setAccessibilityLabel("留白")
         let menu = NSMenu()
         menu.addItem(item("打开留白", #selector(showMainWindow)))
         menu.addItem(.separator())
@@ -114,7 +123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func quit() { NSApp.terminate(nil) }
     @objc func about() {
         NSApp.orderFrontStandardAboutPanel(options: [
-            .applicationName: "留白", .applicationVersion: "0.3.0",
+            .applicationName: "留白", .applicationVersion: "0.3.1",
             .credits: NSAttributedString(string: "跟随时间，自动调节屏幕。\n为你的 Mac 制作。")
         ])
     }

@@ -4,7 +4,7 @@
 
 ## 使用
 
-双击 `dist/留白.app` 启动。0.3.0 只保留一个「智能护眼」开关，自动按护眼宝的时间曲线调整屏幕颜色。当前强度为只读显示，无需手动调节。
+双击 `dist/留白.app` 启动。0.3.1 只保留一个「智能护眼」开关，自动按护眼宝的时间曲线调整屏幕颜色。当前强度为只读显示，无需手动调节。
 
 - **开启智能护眼**：根据本地时间自动计算强度，通过 Gamma 表调整当前连接屏幕的 RGB 输出。
 - **关闭智能护眼**：恢复启用前保存的 Gamma 表。
@@ -44,7 +44,7 @@ bash build.sh --test
 
 ## 智能护眼规则
 
-以已分析的护眼宝 1.2.0 时间规则独立实现，未包含其二进制、资源或反汇编文件。设 `t = 本地小时 + 分钟 / 60`，强度 `s` 在以下节点之间线性插值：
+以已分析的护眼宝 1.2.0 时间规则独立实现，未包含其可执行程序或反汇编文件。界面图标来源见下方说明。设 `t = 本地小时 + 分钟 / 60`，强度 `s` 在以下节点之间线性插值：
 
 | 时间 | 强度 |
 | --- | --- |
@@ -64,6 +64,18 @@ B = 1 - 0.50 × s
 ```
 
 与原版一样，每 30 秒检查当前时间，时间曲线精确到分钟；开启及唤醒时立即计算，仅增益或显示器状态变化时写入。所有计算基于启用前保存的各屏幕 Gamma 表，保留原有曲线形状，避免重复乘算累计变暗。接口为 Apple 的 [CGGetDisplayTransferByTable](https://developer.apple.com/documentation/coregraphics/cggetdisplaytransferbytable(_:_:_:_:_:_:)) 和 [CGSetDisplayTransferByTable](https://developer.apple.com/documentation/coregraphics/cgsetdisplaytransferbytable(_:_:_:_:_:))。
+
+## 界面素材
+
+0.3.1 按本机使用者要求，使用 `/Applications/护眼宝.app/Contents/Resources/` 中的原版素材：
+
+- `AppIcon.icns`：逐字节复制的应用图标，用于 Dock、Finder 和关于窗口。
+- `StatusBar_Icon.png`、`StatusBar_Icon_Highlight.png`：从 `Assets.car` 导出的菜单栏普通/高亮图标，按模板图标适配系统菜单栏颜色。
+- `TitleBar_Normal1.png`、`TitleBar_Selected.png`、`TitleBar_Background.png`：从 `Assets.car` 导出的护眼导航图标、选中背景和顶部背景。只展示护眼入口，不添加健康或资讯功能。
+
+PNG 通过 AppKit 读取原资源后无损导出，不重新绘制。上述素材的权利归原权利人所有，不属于本仓库 MIT 代码许可证的授权范围。构建时从 `Resources/` 复制进应用包，无需运行时安装护眼宝。
+
+本次素材更新已通过编译、应用签名和资源一致性检查，并打开正式应用确认顶部导航图片正常显示。智能护眼算法未改动；前述 63 项检查为 0.3.0 的验证记录。
 
 ## 实现范围
 

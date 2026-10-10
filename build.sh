@@ -17,6 +17,7 @@ else
         -module-cache-path "$TASK_BUILD/ModuleCache" -O \
         "$TASK_ROOT"/Sources/*.swift -o "$TASK_APP/Contents/MacOS/EyeRest"
     cp "$TASK_ROOT/Info.plist" "$TASK_APP/Contents/Info.plist"
+    cp "$TASK_ROOT"/Resources/*.icns "$TASK_ROOT"/Resources/*.png "$TASK_APP/Contents/Resources/"
     codesign --force --sign - "$TASK_APP"
     printf 'Built: %s\n' "$TASK_APP"
 fi

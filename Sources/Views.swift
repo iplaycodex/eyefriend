@@ -9,20 +9,28 @@ struct MainView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
-            HStack(alignment: .top) {
+            HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 7) {
                     Text("给眼睛，一点留白。")
-                        .font(.system(size: 26, weight: .semibold, design: .rounded))
+                        .font(.system(size: 22, weight: .semibold, design: .rounded))
                     Text("跟随时间，自动调节屏幕。")
-                        .font(.system(size: 13)).foregroundStyle(.secondary)
+                        .font(.system(size: 12)).foregroundStyle(.white.opacity(0.9))
                 }
                 Spacer()
-                Image(systemName: "leaf")
-                    .font(.system(size: 29, weight: .light))
-                    .foregroundStyle(leaf)
-                    .frame(width: 54, height: 54)
-                    .background(leaf.opacity(0.09), in: RoundedRectangle(cornerRadius: 18))
+                VStack(spacing: 0) {
+                    Image(nsImage: Artwork.image("TitleBar_Normal1"))
+                        .resizable().scaledToFit().frame(width: 48, height: 48)
+                    Text("护眼").font(.system(size: 12, weight: .semibold))
+                }
+                .frame(width: 82, height: 72)
+                .background(Image(nsImage: Artwork.image("TitleBar_Selected")).resizable())
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("护眼")
             }
+            .padding(.horizontal, 16).padding(.vertical, 8)
+            .foregroundStyle(.white)
+            .background(Image(nsImage: Artwork.image("TitleBar_Background")).resizable().scaledToFill())
+            .clipShape(RoundedRectangle(cornerRadius: 18))
 
             VStack(alignment: .leading, spacing: 20) {
                 Toggle(isOn: $model.smartEnabled) {
