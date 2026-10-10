@@ -48,7 +48,7 @@ struct MainView: View {
                 }
                 ProgressView(value: model.smartEnabled ? model.effectiveLevel : 0)
                     .accessibilityLabel("自动护眼强度")
-                Text("按护眼宝的时间曲线自动调整，白天减弱、夜间增强。关闭即可恢复启用前的屏幕颜色。")
+                Text("随时间自动调整，白天减弱、夜间增强。关闭即可恢复启用前的屏幕颜色。")
                     .font(.system(size: 12)).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                 if let error = model.gammaError {

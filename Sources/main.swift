@@ -123,7 +123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func quit() { NSApp.terminate(nil) }
     @objc func about() {
         NSApp.orderFrontStandardAboutPanel(options: [
-            .applicationName: "EyeFriend", .applicationVersion: "0.3.2",
+            .applicationName: "EyeFriend", .applicationVersion: "0.3.3",
             .credits: NSAttributedString(string: "跟随时间，自动调节屏幕。\n为你的 Mac 制作。")
         ])
     }

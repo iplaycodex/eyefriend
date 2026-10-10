@@ -17,7 +17,7 @@ enum EyeComfort {
         return Double(parts.hour ?? 0) + Double(parts.minute ?? 0) / 60
     }
 
-    // Reconstructed time curves; t is local decimal hours, not HH.mm.
+    // Time-based strength curve; t is local decimal hours, not HH.mm.
     static func smartLevel(hour t: Double) -> Double {
         guard t.isFinite, t >= 0, t <= 24 else { return 0 }
         if t < 3 { return 0.75 + t * 0.05 }
