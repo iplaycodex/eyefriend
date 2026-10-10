@@ -11,7 +11,7 @@ struct MainView: View {
         VStack(alignment: .leading, spacing: 24) {
             HStack(alignment: .center) {
                 VStack(alignment: .leading, spacing: 7) {
-                    Text("给眼睛，一点留白。")
+                    Text("给眼睛，多一点轻松。")
                         .font(.system(size: 22, weight: .semibold, design: .rounded))
                     Text("跟随时间，自动调节屏幕。")
                         .font(.system(size: 12)).foregroundStyle(.white.opacity(0.9))

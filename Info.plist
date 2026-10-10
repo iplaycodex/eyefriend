@@ -2,14 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleExecutable</key><string>EyeRest</string>
+    <key>CFBundleExecutable</key><string>EyeFriend</string>
     <key>CFBundleIdentifier</key><string>local.liuliang.eyerest</string>
-    <key>CFBundleName</key><string>留白</string>
-    <key>CFBundleDisplayName</key><string>留白</string>
+    <key>CFBundleName</key><string>EyeFriend</string>
+    <key>CFBundleDisplayName</key><string>EyeFriend</string>
     <key>CFBundlePackageType</key><string>APPL</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
-    <key>CFBundleShortVersionString</key><string>0.3.1</string>
-    <key>CFBundleVersion</key><string>4</string>
+    <key>CFBundleShortVersionString</key><string>0.3.2</string>
+    <key>CFBundleVersion</key><string>5</string>
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>NSHighResolutionCapable</key><true/>
     <key>NSPrincipalClass</key><string>NSApplication</string>

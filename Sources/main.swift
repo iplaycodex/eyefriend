@@ -42,7 +42,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let size = content.fittingSize
         mainWindow = NSWindow(contentRect: NSRect(origin: .zero, size: size),
             styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
-        mainWindow.title = "留白"
+        mainWindow.title = "EyeFriend"
         mainWindow.contentView = content
         mainWindow.setContentSize(size)
         mainWindow.isReleasedWhenClosed = false
@@ -57,14 +57,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func buildMenu() {
         let bar = NSMenu()
-        let appMenu = NSMenu(title: "留白")
-        appMenu.addItem(item("关于留白", #selector(about)))
+        let appMenu = NSMenu(title: "EyeFriend")
+        appMenu.addItem(item("关于EyeFriend", #selector(about)))
         appMenu.addItem(.separator())
-        let hide = NSMenuItem(title: "隐藏留白", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+        let hide = NSMenuItem(title: "隐藏EyeFriend", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         hide.target = NSApp
         appMenu.addItem(hide)
         appMenu.addItem(.separator())
-        appMenu.addItem(item("退出留白", #selector(quit), key: "q"))
+        appMenu.addItem(item("退出EyeFriend", #selector(quit), key: "q"))
         let root = NSMenuItem()
         root.submenu = appMenu
         bar.addItem(root)
@@ -90,14 +90,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         highlightedIcon.size = NSSize(width: 22, height: 22)
         highlightedIcon.isTemplate = true
         statusItem.button?.alternateImage = highlightedIcon
-        statusItem.button?.setAccessibilityLabel("留白")
+        statusItem.button?.setAccessibilityLabel("EyeFriend")
         let menu = NSMenu()
-        menu.addItem(item("打开留白", #selector(showMainWindow)))
+        menu.addItem(item("打开EyeFriend", #selector(showMainWindow)))
         menu.addItem(.separator())
         smartItem = item("开启智能护眼", #selector(toggleSmart))
         menu.addItem(smartItem)
         menu.addItem(.separator())
-        menu.addItem(item("退出留白", #selector(quit), key: "q"))
+        menu.addItem(item("退出EyeFriend", #selector(quit), key: "q"))
         statusItem.menu = menu
     }
 
@@ -106,8 +106,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if model.gammaError != error { model.gammaError = error }
         smartItem.title = model.smartEnabled ? "关闭智能护眼" : "开启智能护眼"
         smartItem.state = model.smartEnabled ? .on : .off
-        statusItem.button?.toolTip = model.gammaError.map { "留白 · " + $0 } ??
-            (model.smartEnabled ? "留白 · 智能护眼 \(Int((model.effectiveLevel * 100).rounded()))%" : "留白 · 智能护眼已关闭")
+        statusItem.button?.toolTip = model.gammaError.map { "EyeFriend · " + $0 } ??
+            (model.smartEnabled ? "EyeFriend · 智能护眼 \(Int((model.effectiveLevel * 100).rounded()))%" : "EyeFriend · 智能护眼已关闭")
     }
 
     @objc func showMainWindow() {
@@ -123,7 +123,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func quit() { NSApp.terminate(nil) }
     @objc func about() {
         NSApp.orderFrontStandardAboutPanel(options: [
-            .applicationName: "留白", .applicationVersion: "0.3.1",
+            .applicationName: "EyeFriend", .applicationVersion: "0.3.2",
             .credits: NSAttributedString(string: "跟随时间，自动调节屏幕。\n为你的 Mac 制作。")
         ])
     }

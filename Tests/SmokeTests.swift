@@ -42,7 +42,7 @@ func runSmokeTests(app: AppDelegate) async {
     check(app.mainWindow.isVisible, "menu bar reopens closed window")
 
     check(app.statusItem.menu?.items.filter { !$0.isSeparatorItem }.map(\.title) ==
-          ["打开留白", "开启智能护眼", "退出留白"], "menu exposes only automatic protection")
+          ["打开EyeFriend", "开启智能护眼", "退出EyeFriend"], "menu exposes only automatic protection")
 
     let backend = CoreGraphicsGamma()
     var before: [UInt32: GammaTable] = [:]
